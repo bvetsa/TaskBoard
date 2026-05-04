@@ -60,6 +60,12 @@
   color: #87261f;
 }
 
+.summary-strip .success {
+  border-color: #a7d8b4;
+  background: #dff3e5;
+  color: #1e6f3d;
+}
+
 .header-actions {
   display: flex;
   justify-content: flex-end;

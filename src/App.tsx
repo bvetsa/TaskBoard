@@ -791,7 +791,9 @@ function App() {
         </div>
         <div className="summary-strip" aria-label="Board summary">
           <span>{tasks.length} total</span>
-          <span>{completedTasks} done</span>
+          <span className={completedTasks > 0 ? 'success' : ''}>
+            {completedTasks} done
+          </span>
           <span className={overdueTasks > 0 ? 'danger' : ''}>
             {overdueTasks} overdue
           </span>
