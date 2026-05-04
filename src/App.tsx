@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
 import { supabase } from './supabaseClient'
@@ -48,6 +48,7 @@ type TaskLabel = {
 }
 
 type QuickFormType = 'member' | 'label'
+type SubmittingFormType = 'task' | 'member' | 'label'
 
 const columns: { status: TaskStatus; title: string }[] = [
   { status: 'todo', title: 'To Do' },
@@ -165,6 +166,9 @@ function App() {
   )
   const [assigneeFilter, setAssigneeFilter] = useState('all')
   const [labelFilter, setLabelFilter] = useState('all')
+  const [submittingForm, setSubmittingForm] =
+    useState<SubmittingFormType | null>(null)
+  const submittingFormRef = useRef<SubmittingFormType | null>(null)
 
   const completedTasks = tasks.filter((task) => task.status === 'done').length
   const overdueTasks = tasks.filter((task) => {
@@ -199,6 +203,10 @@ function App() {
     return matchesSearch && matchesPriority && matchesAssignee && matchesLabel
   })
   const isEditing = editingTaskId !== null
+  let taskSubmitLabel = isEditing ? 'Save task' : 'Create task'
+  if (submittingForm === 'task') {
+    taskSubmitLabel = isEditing ? 'Saving...' : 'Creating...'
+  }
 
   useEffect(() => {
     async function loadBoard() {
@@ -340,6 +348,19 @@ function App() {
     setActiveQuickForm('label')
   }
 
+  function startSubmittingForm(formType: SubmittingFormType) {
+    if (submittingFormRef.current) return false
+
+    submittingFormRef.current = formType
+    setSubmittingForm(formType)
+    return true
+  }
+
+  function finishSubmittingForm() {
+    submittingFormRef.current = null
+    setSubmittingForm(null)
+  }
+
   async function replaceTaskAssignees(taskId: string, assigneeIds: string[]) {
     const deleteResult = await supabase
       .from('task_assignees')
@@ -425,80 +446,92 @@ function App() {
   async function handleSaveTask(event: FormEvent) {
     event.preventDefault()
 
-    const trimmedTitle = title.trim()
-    if (!trimmedTitle || !userId) return
+    if (!startSubmittingForm('task')) return
 
-    if (editingTaskId) {
-      const updatePayload = {
-        title: trimmedTitle,
-        description: description.trim() || null,
-        priority,
-        due_date: dueDate || null,
-      }
+    try {
+      const trimmedTitle = title.trim()
+      if (!trimmedTitle || !userId) return
 
-      const updateResult = await supabase
-        .from('tasks')
-        .update(updatePayload)
-        .eq('id', editingTaskId)
-        .select()
-        .single()
+      if (editingTaskId) {
+        const updatePayload = {
+          title: trimmedTitle,
+          description: description.trim() || null,
+          priority,
+          due_date: dueDate || null,
+        }
 
-      if (updateResult.error) {
-        setErrorMessage(updateResult.error.message)
+        const updateResult = await supabase
+          .from('tasks')
+          .update(updatePayload)
+          .eq('id', editingTaskId)
+          .select()
+          .single()
+
+        if (updateResult.error) {
+          setErrorMessage(updateResult.error.message)
+          return
+        }
+
+        const assigneesSaved = await replaceTaskAssignees(
+          editingTaskId,
+          selectedAssigneeIds,
+        )
+        if (!assigneesSaved) return
+
+        const labelsSaved = await replaceTaskLabels(
+          editingTaskId,
+          selectedLabelIds,
+        )
+        if (!labelsSaved) return
+
+        setTasks((currentTasks) =>
+          currentTasks.map((task) =>
+            task.id === editingTaskId ? (updateResult.data as Task) : task,
+          ),
+        )
+        resetTaskForm()
         return
       }
 
+      const newTask = {
+        title: trimmedTitle,
+        description: description.trim() || null,
+        status: 'todo',
+        priority,
+        due_date: dueDate || null,
+        user_id: userId,
+      }
+
+      const insertResult = await supabase
+        .from('tasks')
+        .insert(newTask)
+        .select()
+        .single()
+
+      if (insertResult.error) {
+        setErrorMessage(insertResult.error.message)
+        return
+      }
+
+      const createdTask = insertResult.data as Task
+
       const assigneesSaved = await replaceTaskAssignees(
-        editingTaskId,
+        createdTask.id,
         selectedAssigneeIds,
       )
       if (!assigneesSaved) return
 
-      const labelsSaved = await replaceTaskLabels(editingTaskId, selectedLabelIds)
+      const labelsSaved = await replaceTaskLabels(
+        createdTask.id,
+        selectedLabelIds,
+      )
       if (!labelsSaved) return
 
-      setTasks((currentTasks) =>
-        currentTasks.map((task) =>
-          task.id === editingTaskId ? (updateResult.data as Task) : task,
-        ),
-      )
+      setTasks((currentTasks) => [createdTask, ...currentTasks])
       resetTaskForm()
-      return
+    } finally {
+      finishSubmittingForm()
     }
-
-    const newTask = {
-      title: trimmedTitle,
-      description: description.trim() || null,
-      status: 'todo',
-      priority,
-      due_date: dueDate || null,
-      user_id: userId,
-    }
-
-    const insertResult = await supabase
-      .from('tasks')
-      .insert(newTask)
-      .select()
-      .single()
-
-    if (insertResult.error) {
-      setErrorMessage(insertResult.error.message)
-      return
-    }
-
-    const createdTask = insertResult.data as Task
-
-    const assigneesSaved = await replaceTaskAssignees(
-      createdTask.id,
-      selectedAssigneeIds,
-    )
-    if (!assigneesSaved) return
-
-    const labelsSaved = await replaceTaskLabels(createdTask.id, selectedLabelIds)
-    if (!labelsSaved) return
-
-    setTasks((currentTasks) => [createdTask, ...currentTasks])
-    resetTaskForm()
   }
 
   async function handleDeleteTask() {
@@ -532,32 +565,38 @@ function App() {
   async function handleCreateMember(event: FormEvent) {
     event.preventDefault()
 
-    const trimmedName = newMemberName.trim()
-    if (!trimmedName || !userId) return
+    if (!startSubmittingForm('member')) return
 
-    const member = {
-      user_id: userId,
-      name: trimmedName,
-      avatar_color: avatarColors[members.length % avatarColors.length],
+    try {
+      const trimmedName = newMemberName.trim()
+      if (!trimmedName || !userId) return
+
+      const member = {
+        user_id: userId,
+        name: trimmedName,
+        avatar_color: avatarColors[members.length % avatarColors.length],
+      }
+
+      const insertResult = await supabase
+        .from('team_members')
+        .insert(member)
+        .select()
+        .single()
+
+      if (insertResult.error) {
+        setErrorMessage(insertResult.error.message)
+        return
+      }
+
+      setMembers((currentMembers) => [
+        ...currentMembers,
+        insertResult.data as TeamMember,
+      ])
+      setNewMemberName('')
+      setActiveQuickForm(null)
+    } finally {
+      finishSubmittingForm()
     }
-
-    const insertResult = await supabase
-      .from('team_members')
-      .insert(member)
-      .select()
-      .single()
-
-    if (insertResult.error) {
-      setErrorMessage(insertResult.error.message)
-      return
-    }
-
-    setMembers((currentMembers) => [
-      ...currentMembers,
-      insertResult.data as TeamMember,
-    ])
-    setNewMemberName('')
-    setActiveQuickForm(null)
   }
 
   async function handleRemoveMember(member: TeamMember) {
@@ -603,29 +642,38 @@ function App() {
   async function handleCreateLabel(event: FormEvent) {
     event.preventDefault()
 
-    const trimmedName = newLabelName.trim()
-    if (!trimmedName || !userId) return
+    if (!startSubmittingForm('label')) return
 
-    const label = {
-      user_id: userId,
-      name: trimmedName,
-      color: labelColors[labels.length % labelColors.length],
+    try {
+      const trimmedName = newLabelName.trim()
+      if (!trimmedName || !userId) return
+
+      const label = {
+        user_id: userId,
+        name: trimmedName,
+        color: labelColors[labels.length % labelColors.length],
+      }
+
+      const insertResult = await supabase
+        .from('labels')
+        .insert(label)
+        .select()
+        .single()
+
+      if (insertResult.error) {
+        setErrorMessage(insertResult.error.message)
+        return
+      }
+
+      setLabels((currentLabels) => [
+        ...currentLabels,
+        insertResult.data as Label,
+      ])
+      setNewLabelName('')
+      setActiveQuickForm(null)
+    } finally {
+      finishSubmittingForm()
     }
-
-    const insertResult = await supabase
-      .from('labels')
-      .insert(label)
-      .select()
-      .single()
-
-    if (insertResult.error) {
-      setErrorMessage(insertResult.error.message)
-      return
-    }
-
-    setLabels((currentLabels) => [...currentLabels, insertResult.data as Label])
-    setNewLabelName('')
-    setActiveQuickForm(null)
   }
 
   async function handleRemoveLabel(label: Label) {
@@ -844,6 +892,7 @@ function App() {
           <form
             aria-labelledby="member-form-title"
             aria-modal="true"
+            aria-busy={submittingForm === 'member'}
             className="task-form quick-form"
             onKeyDown={(event) => {
               if (event.key === 'Escape') closeQuickForm()
@@ -904,7 +953,9 @@ function App() {
               <button type="button" onClick={closeQuickForm}>
                 Cancel
               </button>
-              <button type="submit">Add member</button>
+              <button disabled={submittingForm === 'member'} type="submit">
+                {submittingForm === 'member' ? 'Adding...' : 'Add member'}
+              </button>
             </div>
           </form>
         </div>
@@ -915,6 +966,7 @@ function App() {
           <form
             aria-labelledby="label-form-title"
             aria-modal="true"
+            aria-busy={submittingForm === 'label'}
             className="task-form quick-form"
             onKeyDown={(event) => {
               if (event.key === 'Escape') closeQuickForm()
@@ -973,7 +1025,9 @@ function App() {
               <button type="button" onClick={closeQuickForm}>
                 Cancel
               </button>
-              <button type="submit">Add tag</button>
+              <button disabled={submittingForm === 'label'} type="submit">
+                {submittingForm === 'label' ? 'Adding...' : 'Add tag'}
+              </button>
             </div>
           </form>
         </div>
@@ -983,6 +1037,7 @@ function App() {
         <div className="modal-backdrop" role="presentation">
           <form
             aria-modal="true"
+            aria-busy={submittingForm === 'task'}
             aria-labelledby="task-form-title"
             className="task-form"
             onKeyDown={(event) => {
@@ -1114,8 +1169,8 @@ function App() {
               <button type="button" onClick={resetTaskForm}>
                 Cancel
               </button>
-              <button type="submit">
-                {isEditing ? 'Save task' : 'Create task'}
+              <button disabled={submittingForm === 'task'} type="submit">
+                {taskSubmitLabel}
               </button>
             </div>
           </form>

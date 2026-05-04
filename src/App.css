@@ -395,6 +395,11 @@
   color: white;
 }
 
+.form-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .form-actions .danger-action {
   margin-right: auto;
   border-color: #edb8b2;
