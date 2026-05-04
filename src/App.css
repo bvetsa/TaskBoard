@@ -6,9 +6,9 @@
 }
 
 .app-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 24px;
   margin-bottom: 24px;
 }
@@ -27,6 +27,39 @@
   line-height: 1;
 }
 
+.session-note {
+  margin: 8px 0 0;
+  color: #6f6b63;
+  font-size: 13px;
+}
+
+.summary-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.summary-strip span {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid #ddd6ca;
+  border-radius: 8px;
+  background: white;
+  color: #6f6b63;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.summary-strip .danger {
+  border-color: #edb8b2;
+  background: #f9dfdc;
+  color: #87261f;
+}
+
 .app-header button {
   height: 40px;
   padding: 0 16px;
@@ -35,6 +68,29 @@
   background: #24211e;
   color: white;
   font-weight: 800;
+}
+
+.system-message,
+.loading-state {
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  border: 1px solid #d94f45;
+  border-radius: 8px;
+  background: #f9dfdc;
+  color: #87261f;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.loading-state {
+  grid-column: 1 / -1;
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  border-color: #ddd6ca;
+  background: #fffcf7;
+  color: #6f6b63;
 }
 
 .task-form {
@@ -51,7 +107,7 @@
 
 .form-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 180px;
+  grid-template-columns: minmax(0, 1fr) 160px 160px;
   gap: 12px;
 }
 
@@ -233,6 +289,29 @@
   color: #145349;
 }
 
+.due-date {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.due-date.neutral {
+  background: #f0ebe2;
+  color: #6f6b63;
+}
+
+.due-date.soon {
+  background: #f5e4ca;
+  color: #6c3e12;
+}
+
+.due-date.overdue {
+  background: #f9dfdc;
+  color: #87261f;
+}
+
 @media (max-width: 960px) {
   .app-shell {
     padding: 20px;
@@ -248,7 +327,7 @@
 @media (max-width: 640px) {
   .app-header {
     align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .app-header button {
