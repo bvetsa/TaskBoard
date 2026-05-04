@@ -108,7 +108,7 @@
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 160px 180px 160px auto;
+  grid-template-columns: minmax(240px, 1fr) 160px 180px 160px 112px;
   gap: 12px;
   align-items: end;
   margin-bottom: 18px;
@@ -119,6 +119,7 @@
 }
 
 .toolbar label {
+  min-width: 0;
   display: grid;
   gap: 7px;
   color: #6f6b63;
@@ -129,6 +130,7 @@
 
 .toolbar input,
 .toolbar select {
+  box-sizing: border-box;
   width: 100%;
   height: 40px;
   border: 1px solid #cfc5b7;
@@ -147,8 +149,9 @@
 }
 
 .toolbar button {
+  width: 100%;
   height: 40px;
-  padding: 0 14px;
+  padding: 0 10px;
   border: 1px solid #cfc5b7;
   border-radius: 8px;
   background: white;
@@ -254,7 +257,7 @@
 }
 
 .task-form {
-  width: min(760px, 100%);
+  width: min(560px, 100%);
   max-height: calc(100vh - 48px);
   display: grid;
   gap: 14px;
@@ -268,7 +271,7 @@
 }
 
 .quick-form {
-  width: min(440px, 100%);
+  width: min(260px, 100%);
 }
 
 .task-form-header {
@@ -280,6 +283,7 @@
 
 .task-form-header h2 {
   margin: 0;
+  color: #000;
   font-size: 17px;
 }
 
@@ -316,11 +320,20 @@
 
 .form-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px 160px;
+  grid-template-columns: 130px 130px 125px;
   gap: 12px;
 }
 
+.task-form > label {
+  width: min(100%, 500px);
+}
+
+.quick-form > label {
+  width: min(100%, 220px);
+}
+
 .task-form label {
+  min-width: 0;
   display: grid;
   gap: 7px;
   color: #6f6b63;
@@ -332,6 +345,7 @@
 .task-form input,
 .task-form select,
 .task-form textarea {
+  box-sizing: border-box;
   width: 100%;
   border: 1px solid #cfc5b7;
   border-radius: 8px;
