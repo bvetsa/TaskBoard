@@ -37,6 +37,85 @@
   font-weight: 800;
 }
 
+.task-form {
+  display: grid;
+  gap: 14px;
+  max-width: 760px;
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid #ddd6ca;
+  border-radius: 8px;
+  background: #fffcf7;
+  box-shadow: 0 8px 20px rgb(51 42 31 / 7%);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 12px;
+}
+
+.task-form label {
+  display: grid;
+  gap: 7px;
+  color: #6f6b63;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.task-form input,
+.task-form select,
+.task-form textarea {
+  width: 100%;
+  border: 1px solid #cfc5b7;
+  border-radius: 8px;
+  background: white;
+  color: #24211e;
+  font: inherit;
+  outline: none;
+}
+
+.task-form input,
+.task-form select {
+  height: 40px;
+  padding: 0 10px;
+}
+
+.task-form textarea {
+  resize: vertical;
+  padding: 10px;
+}
+
+.task-form input:focus,
+.task-form select:focus,
+.task-form textarea:focus {
+  border-color: #4f62b3;
+  box-shadow: 0 0 0 3px #e1e6f8;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.form-actions button {
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid #cfc5b7;
+  border-radius: 8px;
+  background: white;
+  color: #24211e;
+  font-weight: 800;
+}
+
+.form-actions button[type='submit'] {
+  border-color: #24211e;
+  background: #24211e;
+  color: white;
+}
+
 .board {
   display: grid;
   grid-template-columns: repeat(4, minmax(220px, 1fr));
@@ -49,6 +128,13 @@
   border: 1px solid #ddd6ca;
   border-radius: 8px;
   background: #fffcf7;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.column:hover {
+  border-color: #cfc5b7;
 }
 
 .column-header {
@@ -91,8 +177,23 @@
   border: 1px solid #ddd6ca;
   border-radius: 8px;
   background: white;
+  cursor: grab;
   text-align: left;
   box-shadow: 0 8px 20px rgb(51 42 31 / 7%);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.task-card:hover {
+  border-color: #cfc5b7;
+  box-shadow: 0 12px 26px rgb(51 42 31 / 10%);
+  transform: translateY(-1px);
+}
+
+.task-card:active {
+  cursor: grabbing;
 }
 
 .task-card h3 {
@@ -151,6 +252,18 @@
   }
 
   .app-header button {
+    width: 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .form-actions button {
     width: 100%;
   }
 }
