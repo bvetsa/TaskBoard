@@ -17,12 +17,29 @@ type Task = {
   updated_at: string
 }
 
+type TeamMember = {
+  id: string
+  user_id: string
+  name: string
+  avatar_color: string
+  created_at: string
+}
+
+type TaskAssignee = {
+  user_id: string
+  task_id: string
+  member_id: string
+  created_at: string
+}
+
 const columns: { status: TaskStatus; title: string }[] = [
   { status: 'todo', title: 'To Do' },
   { status: 'in_progress', title: 'In Progress' },
   { status: 'in_review', title: 'In Review' },
   { status: 'done', title: 'Done' },
 ]
+
+const avatarColors = ['#d94f45', '#21867a', '#4f62b3', '#b56b23', '#6d5cae']
 
 const initialTasks: Task[] = [
   {
@@ -92,8 +109,19 @@ function getDueDateTone(task: Task) {
   return 'neutral'
 }
 
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}
+
 function App() {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [members, setMembers] = useState<TeamMember[]>([])
+  const [taskAssignees, setTaskAssignees] = useState<TaskAssignee[]>([])
   const [userId, setUserId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -102,11 +130,14 @@ function App() {
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<Task['priority']>('normal')
   const [dueDate, setDueDate] = useState('')
+  const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([])
+  const [newMemberName, setNewMemberName] = useState('')
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<Task['priority'] | 'all'>(
     'all',
   )
+  const [assigneeFilter, setAssigneeFilter] = useState('all')
 
   const completedTasks = tasks.filter((task) => task.status === 'done').length
   const overdueTasks = tasks.filter((task) => {
@@ -126,8 +157,14 @@ function App() {
       (task.description ?? '').toLowerCase().includes(normalizedSearch)
     const matchesPriority =
       priorityFilter === 'all' || task.priority === priorityFilter
+    const matchesAssignee =
+      assigneeFilter === 'all' ||
+      taskAssignees.some(
+        (assignee) =>
+          assignee.task_id === task.id && assignee.member_id === assigneeFilter,
+      )
 
-    return matchesSearch && matchesPriority
+    return matchesSearch && matchesPriority && matchesAssignee
   })
 
   useEffect(() => {
@@ -159,15 +196,32 @@ function App() {
 
       setUserId(user.id)
 
-      const tasksResult = await supabase
-        .from('tasks')
-        .select('*')
-        .order('created_at', { ascending: true })
+      const [tasksResult, membersResult, assigneesResult] = await Promise.all([
+        supabase.from('tasks').select('*').order('created_at', {
+          ascending: true,
+        }),
+        supabase.from('team_members').select('*').order('created_at', {
+          ascending: true,
+        }),
+        supabase.from('task_assignees').select('*'),
+      ])
 
       if (tasksResult.error) {
         setErrorMessage(tasksResult.error.message)
       } else {
         setTasks(tasksResult.data as Task[])
+      }
+
+      if (membersResult.error) {
+        setErrorMessage(membersResult.error.message)
+      } else {
+        setMembers(membersResult.data as TeamMember[])
+      }
+
+      if (assigneesResult.error) {
+        setErrorMessage(assigneesResult.error.message)
+      } else {
+        setTaskAssignees(assigneesResult.data as TaskAssignee[])
       }
 
       setIsLoading(false)
@@ -202,12 +256,86 @@ function App() {
       return
     }
 
-    setTasks((currentTasks) => [insertResult.data as Task, ...currentTasks])
+    const createdTask = insertResult.data as Task
+
+    if (selectedAssigneeIds.length > 0) {
+      const assigneeRows = selectedAssigneeIds.map((memberId) => ({
+        user_id: userId,
+        task_id: createdTask.id,
+        member_id: memberId,
+      }))
+
+      const assigneeResult = await supabase
+        .from('task_assignees')
+        .insert(assigneeRows)
+        .select()
+
+      if (assigneeResult.error) {
+        setErrorMessage(assigneeResult.error.message)
+        return
+      }
+
+      setTaskAssignees((currentAssignees) => [
+        ...(assigneeResult.data as TaskAssignee[]),
+        ...currentAssignees,
+      ])
+    }
+
+    setTasks((currentTasks) => [createdTask, ...currentTasks])
     setTitle('')
     setDescription('')
     setPriority('normal')
     setDueDate('')
+    setSelectedAssigneeIds([])
     setIsFormOpen(false)
+  }
+
+  async function handleCreateMember(event: FormEvent) {
+    event.preventDefault()
+
+    const trimmedName = newMemberName.trim()
+    if (!trimmedName || !userId) return
+
+    const member = {
+      user_id: userId,
+      name: trimmedName,
+      avatar_color: avatarColors[members.length % avatarColors.length],
+    }
+
+    const insertResult = await supabase
+      .from('team_members')
+      .insert(member)
+      .select()
+      .single()
+
+    if (insertResult.error) {
+      setErrorMessage(insertResult.error.message)
+      return
+    }
+
+    setMembers((currentMembers) => [
+      ...currentMembers,
+      insertResult.data as TeamMember,
+    ])
+    setNewMemberName('')
+  }
+
+  function toggleSelectedAssignee(memberId: string) {
+    setSelectedAssigneeIds((currentIds) =>
+      currentIds.includes(memberId)
+        ? currentIds.filter((id) => id !== memberId)
+        : [...currentIds, memberId],
+    )
+  }
+
+  function getTaskMembers(taskId: string) {
+    const memberIds = new Set(
+      taskAssignees
+        .filter((assignee) => assignee.task_id === taskId)
+        .map((assignee) => assignee.member_id),
+    )
+
+    return members.filter((member) => memberIds.has(member.id))
   }
 
   async function moveTask(taskId: string, status: TaskStatus) {
@@ -286,15 +414,62 @@ function App() {
           </select>
         </label>
 
+        <label>
+          Assignee
+          <select
+            value={assigneeFilter}
+            onChange={(event) => setAssigneeFilter(event.target.value)}
+          >
+            <option value="all">All assignees</option>
+            {members.map((member) => (
+              <option value={member.id} key={member.id}>
+                {member.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <button
           type="button"
           onClick={() => {
             setSearchQuery('')
             setPriorityFilter('all')
+            setAssigneeFilter('all')
           }}
         >
           Clear filters
         </button>
+      </section>
+
+      <section className="team-panel" aria-label="Team members">
+        <div>
+          <h2>Team</h2>
+          <div className="member-list">
+            {members.map((member) => (
+              <span className="member-chip" key={member.id}>
+                <span
+                  className="avatar"
+                  style={{ backgroundColor: member.avatar_color }}
+                >
+                  {getInitials(member.name)}
+                </span>
+                {member.name}
+              </span>
+            ))}
+            {members.length === 0 && (
+              <span className="muted-note">No team members yet</span>
+            )}
+          </div>
+        </div>
+
+        <form className="member-form" onSubmit={handleCreateMember}>
+          <input
+            value={newMemberName}
+            onChange={(event) => setNewMemberName(event.target.value)}
+            placeholder="Add team member"
+          />
+          <button type="submit">Add</button>
+        </form>
       </section>
 
       {isFormOpen && (
@@ -343,6 +518,30 @@ function App() {
               rows={3}
             />
           </label>
+
+          {members.length > 0 && (
+            <fieldset className="assignee-picker">
+              <legend>Assignees</legend>
+              <div>
+                {members.map((member) => (
+                  <label key={member.id}>
+                    <input
+                      checked={selectedAssigneeIds.includes(member.id)}
+                      onChange={() => toggleSelectedAssignee(member.id)}
+                      type="checkbox"
+                    />
+                    <span
+                      className="avatar"
+                      style={{ backgroundColor: member.avatar_color }}
+                    >
+                      {getInitials(member.name)}
+                    </span>
+                    {member.name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
 
           <div className="form-actions">
             <button type="button" onClick={() => setIsFormOpen(false)}>
@@ -393,6 +592,23 @@ function App() {
                         {formatDueDate(task.due_date)}
                       </span>
                     )}
+                    <div className="card-footer">
+                      <div className="avatar-stack">
+                        {getTaskMembers(task.id).map((member) => (
+                          <span
+                            className="avatar"
+                            key={member.id}
+                            style={{ backgroundColor: member.avatar_color }}
+                            title={member.name}
+                          >
+                            {getInitials(member.name)}
+                          </span>
+                        ))}
+                      </div>
+                      {getTaskMembers(task.id).length === 0 && (
+                        <span className="muted-note">Unassigned</span>
+                      )}
+                    </div>
                   </article>
                 ))}
                 {columnTasks.length === 0 && (
