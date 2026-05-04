@@ -1,6 +1,6 @@
 .app-shell {
   min-height: 100vh;
-  padding: 32px;
+  padding: 24px;
   background: #f6f4ef;
   color: #24211e;
 }
@@ -578,7 +578,7 @@
 
 @media (max-width: 960px) {
   .app-shell {
-    padding: 20px;
+    padding: 16px;
   }
 
   .board {
