@@ -560,6 +560,46 @@ function App() {
     setActiveQuickForm(null)
   }
 
+  async function handleRemoveMember(member: TeamMember) {
+    if (!userId) return
+
+    const confirmed = window.confirm(`Remove ${member.name} from the team?`)
+    if (!confirmed) return
+
+    const assigneeDeleteResult = await supabase
+      .from('task_assignees')
+      .delete()
+      .eq('member_id', member.id)
+      .eq('user_id', userId)
+
+    if (assigneeDeleteResult.error) {
+      setErrorMessage(assigneeDeleteResult.error.message)
+      return
+    }
+
+    const memberDeleteResult = await supabase
+      .from('team_members')
+      .delete()
+      .eq('id', member.id)
+      .eq('user_id', userId)
+
+    if (memberDeleteResult.error) {
+      setErrorMessage(memberDeleteResult.error.message)
+      return
+    }
+
+    setMembers((currentMembers) =>
+      currentMembers.filter((currentMember) => currentMember.id !== member.id),
+    )
+    setTaskAssignees((currentAssignees) =>
+      currentAssignees.filter((assignee) => assignee.member_id !== member.id),
+    )
+    setSelectedAssigneeIds((currentIds) =>
+      currentIds.filter((memberId) => memberId !== member.id),
+    )
+    if (assigneeFilter === member.id) setAssigneeFilter('all')
+  }
+
   async function handleCreateLabel(event: FormEvent) {
     event.preventDefault()
 
@@ -586,6 +626,46 @@ function App() {
     setLabels((currentLabels) => [...currentLabels, insertResult.data as Label])
     setNewLabelName('')
     setActiveQuickForm(null)
+  }
+
+  async function handleRemoveLabel(label: Label) {
+    if (!userId) return
+
+    const confirmed = window.confirm(`Remove the ${label.name} tag?`)
+    if (!confirmed) return
+
+    const taskLabelDeleteResult = await supabase
+      .from('task_labels')
+      .delete()
+      .eq('label_id', label.id)
+      .eq('user_id', userId)
+
+    if (taskLabelDeleteResult.error) {
+      setErrorMessage(taskLabelDeleteResult.error.message)
+      return
+    }
+
+    const labelDeleteResult = await supabase
+      .from('labels')
+      .delete()
+      .eq('id', label.id)
+      .eq('user_id', userId)
+
+    if (labelDeleteResult.error) {
+      setErrorMessage(labelDeleteResult.error.message)
+      return
+    }
+
+    setLabels((currentLabels) =>
+      currentLabels.filter((currentLabel) => currentLabel.id !== label.id),
+    )
+    setTaskLabels((currentLabels) =>
+      currentLabels.filter((currentLabel) => currentLabel.label_id !== label.id),
+    )
+    setSelectedLabelIds((currentIds) =>
+      currentIds.filter((labelId) => labelId !== label.id),
+    )
+    if (labelFilter === label.id) setLabelFilter('all')
   }
 
   function toggleSelectedAssignee(memberId: string) {
@@ -799,14 +879,22 @@ function App() {
             {members.length > 0 && (
               <div className="resource-preview" aria-label="Current members">
                 {members.map((member) => (
-                  <span className="member-chip" key={member.id}>
+                  <span className="member-chip removable" key={member.id}>
                     <span
                       className="avatar"
                       style={{ backgroundColor: member.avatar_color }}
                     >
                       {getInitials(member.name)}
                     </span>
-                    {member.name}
+                    <span>{member.name}</span>
+                    <button
+                      aria-label={`Remove ${member.name}`}
+                      className="resource-remove"
+                      onClick={() => void handleRemoveMember(member)}
+                      type="button"
+                    >
+                      &times;
+                    </button>
                   </span>
                 ))}
               </div>
@@ -862,12 +950,20 @@ function App() {
             {labels.length > 0 && (
               <div className="resource-preview" aria-label="Current tags">
                 {labels.map((label) => (
-                  <span className="label-chip" key={label.id}>
+                  <span className="label-chip removable" key={label.id}>
                     <span
                       className="label-dot"
                       style={{ backgroundColor: label.color }}
                     />
-                    {label.name}
+                    <span>{label.name}</span>
+                    <button
+                      aria-label={`Remove ${label.name}`}
+                      className="resource-remove"
+                      onClick={() => void handleRemoveLabel(label)}
+                      type="button"
+                    >
+                      &times;
+                    </button>
                   </span>
                 ))}
               </div>

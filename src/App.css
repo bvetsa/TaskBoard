@@ -170,6 +170,11 @@
   font-weight: 800;
 }
 
+.member-chip.removable,
+.label-chip.removable {
+  padding-right: 5px;
+}
+
 .label-chip {
   min-height: 30px;
   width: fit-content;
@@ -197,6 +202,26 @@
   height: 9px;
   flex: 0 0 auto;
   border-radius: 50%;
+}
+
+.resource-remove {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #ddd6ca;
+  border-radius: 50%;
+  background: #fffcf7;
+  color: #6f6b63;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.resource-remove:hover {
+  border-color: #edb8b2;
+  background: #f9dfdc;
+  color: #87261f;
 }
 
 .avatar {
