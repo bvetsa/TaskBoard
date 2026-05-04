@@ -103,6 +103,10 @@ function App() {
   const [priority, setPriority] = useState<Task['priority']>('normal')
   const [dueDate, setDueDate] = useState('')
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState<Task['priority'] | 'all'>(
+    'all',
+  )
 
   const completedTasks = tasks.filter((task) => task.status === 'done').length
   const overdueTasks = tasks.filter((task) => {
@@ -114,6 +118,17 @@ function App() {
     const due = new Date(`${task.due_date}T00:00:00`)
     return due < today
   }).length
+  const visibleTasks = tasks.filter((task) => {
+    const normalizedSearch = searchQuery.trim().toLowerCase()
+    const matchesSearch =
+      !normalizedSearch ||
+      task.title.toLowerCase().includes(normalizedSearch) ||
+      (task.description ?? '').toLowerCase().includes(normalizedSearch)
+    const matchesPriority =
+      priorityFilter === 'all' || task.priority === priorityFilter
+
+    return matchesSearch && matchesPriority
+  })
 
   useEffect(() => {
     async function loadBoard() {
@@ -246,6 +261,42 @@ function App() {
 
       {errorMessage && <div className="system-message">{errorMessage}</div>}
 
+      <section className="toolbar" aria-label="Board filters">
+        <label>
+          Search
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search title or description"
+          />
+        </label>
+
+        <label>
+          Priority
+          <select
+            value={priorityFilter}
+            onChange={(event) =>
+              setPriorityFilter(event.target.value as Task['priority'] | 'all')
+            }
+          >
+            <option value="all">All priorities</option>
+            <option value="low">Low</option>
+            <option value="normal">Normal</option>
+            <option value="high">High</option>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSearchQuery('')
+            setPriorityFilter('all')
+          }}
+        >
+          Clear filters
+        </button>
+      </section>
+
       {isFormOpen && (
         <form className="task-form" onSubmit={handleCreateTask}>
           <div className="form-grid">
@@ -307,7 +358,9 @@ function App() {
           <div className="loading-state">Loading board...</div>
         ) : (
           columns.map((column) => {
-          const columnTasks = tasks.filter((task) => task.status === column.status)
+          const columnTasks = visibleTasks.filter(
+            (task) => task.status === column.status,
+          )
 
           return (
             <section
@@ -342,6 +395,9 @@ function App() {
                     )}
                   </article>
                 ))}
+                {columnTasks.length === 0 && (
+                  <div className="empty-column">No matching tasks</div>
+                )}
               </div>
             </section>
           )
