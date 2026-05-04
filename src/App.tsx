@@ -777,119 +777,146 @@ function App() {
       </section>
 
       {isFormOpen && (
-        <form className="task-form" onSubmit={handleSaveTask}>
-          <div className="task-form-header">
-            <h2>{isEditing ? 'Edit task' : 'New task'}</h2>
-            <span>{isEditing ? 'Update fields and save' : 'Tasks start in To Do'}</span>
-          </div>
-
-          <div className="form-grid">
-            <label>
-              Title
-              <input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Write task title"
-                autoFocus
-              />
-            </label>
-
-            <label>
-              Priority
-              <select
-                value={priority}
-                onChange={(event) =>
-                  setPriority(event.target.value as Task['priority'])
-                }
-              >
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-              </select>
-            </label>
-
-            <label>
-              Due date
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-              />
-            </label>
-          </div>
-
-          <label>
-            Description
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="Add useful context for the work"
-              rows={3}
-            />
-          </label>
-
-          {members.length > 0 && (
-            <fieldset className="assignee-picker">
-              <legend>Assignees</legend>
+        <div className="modal-backdrop" role="presentation">
+          <form
+            aria-modal="true"
+            aria-labelledby="task-form-title"
+            className="task-form"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') resetTaskForm()
+            }}
+            onSubmit={handleSaveTask}
+            role="dialog"
+          >
+            <div className="task-form-header">
               <div>
-                {members.map((member) => (
-                  <label key={member.id}>
-                    <input
-                      checked={selectedAssigneeIds.includes(member.id)}
-                      onChange={() => toggleSelectedAssignee(member.id)}
-                      type="checkbox"
-                    />
-                    <span
-                      className="avatar"
-                      style={{ backgroundColor: member.avatar_color }}
-                    >
-                      {getInitials(member.name)}
-                    </span>
-                    {member.name}
-                  </label>
-                ))}
+                <h2 id="task-form-title">
+                  {isEditing ? 'Edit task' : 'New task'}
+                </h2>
+                <span>
+                  {isEditing ? 'Update fields and save' : 'Tasks start in To Do'}
+                </span>
               </div>
-            </fieldset>
-          )}
-
-          {labels.length > 0 && (
-            <fieldset className="assignee-picker">
-              <legend>Labels</legend>
-              <div>
-                {labels.map((label) => (
-                  <label key={label.id}>
-                    <input
-                      checked={selectedLabelIds.includes(label.id)}
-                      onChange={() => toggleSelectedLabel(label.id)}
-                      type="checkbox"
-                    />
-                    <span
-                      className="label-dot"
-                      style={{ backgroundColor: label.color }}
-                    />
-                    {label.name}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          )}
-
-          <div className="form-actions">
-            {isEditing && (
               <button
-                className="danger-action"
+                className="icon-button"
                 type="button"
-                onClick={() => void handleDeleteTask()}
+                onClick={resetTaskForm}
+                aria-label="Close task form"
               >
-                Delete task
+                &times;
               </button>
+            </div>
+
+            <div className="form-grid">
+              <label>
+                Title
+                <input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="Write task title"
+                  autoFocus
+                />
+              </label>
+
+              <label>
+                Priority
+                <select
+                  value={priority}
+                  onChange={(event) =>
+                    setPriority(event.target.value as Task['priority'])
+                  }
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+
+              <label>
+                Due date
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(event) => setDueDate(event.target.value)}
+                />
+              </label>
+            </div>
+
+            <label>
+              Description
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Add useful context for the work"
+                rows={3}
+              />
+            </label>
+
+            {members.length > 0 && (
+              <fieldset className="assignee-picker">
+                <legend>Assignees</legend>
+                <div>
+                  {members.map((member) => (
+                    <label key={member.id}>
+                      <input
+                        checked={selectedAssigneeIds.includes(member.id)}
+                        onChange={() => toggleSelectedAssignee(member.id)}
+                        type="checkbox"
+                      />
+                      <span
+                        className="avatar"
+                        style={{ backgroundColor: member.avatar_color }}
+                      >
+                        {getInitials(member.name)}
+                      </span>
+                      {member.name}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
             )}
-            <button type="button" onClick={resetTaskForm}>
-              Cancel
-            </button>
-            <button type="submit">{isEditing ? 'Save task' : 'Create task'}</button>
-          </div>
-        </form>
+
+            {labels.length > 0 && (
+              <fieldset className="assignee-picker">
+                <legend>Labels</legend>
+                <div>
+                  {labels.map((label) => (
+                    <label key={label.id}>
+                      <input
+                        checked={selectedLabelIds.includes(label.id)}
+                        onChange={() => toggleSelectedLabel(label.id)}
+                        type="checkbox"
+                      />
+                      <span
+                        className="label-dot"
+                        style={{ backgroundColor: label.color }}
+                      />
+                      {label.name}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
+
+            <div className="form-actions">
+              {isEditing && (
+                <button
+                  className="danger-action"
+                  type="button"
+                  onClick={() => void handleDeleteTask()}
+                >
+                  Delete task
+                </button>
+              )}
+              <button type="button" onClick={resetTaskForm}>
+                Cancel
+              </button>
+              <button type="submit">
+                {isEditing ? 'Save task' : 'Create task'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       <section className="board" aria-label="Kanban task board">
