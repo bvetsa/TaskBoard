@@ -144,6 +144,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<Task['priority']>('normal')
@@ -192,6 +193,7 @@ function App() {
 
     return matchesSearch && matchesPriority && matchesAssignee && matchesLabel
   })
+  const isEditing = editingTaskId !== null
 
   useEffect(() => {
     async function loadBoard() {
@@ -278,11 +280,166 @@ function App() {
     void loadBoard()
   }, [])
 
-  async function handleCreateTask(event: FormEvent) {
+  function resetTaskForm() {
+    setTitle('')
+    setDescription('')
+    setPriority('normal')
+    setDueDate('')
+    setSelectedAssigneeIds([])
+    setSelectedLabelIds([])
+    setEditingTaskId(null)
+    setIsFormOpen(false)
+  }
+
+  function openCreateTaskForm() {
+    resetTaskForm()
+    setIsFormOpen(true)
+  }
+
+  function openEditTaskForm(task: Task) {
+    setEditingTaskId(task.id)
+    setTitle(task.title)
+    setDescription(task.description ?? '')
+    setPriority(task.priority)
+    setDueDate(task.due_date ?? '')
+    setSelectedAssigneeIds(
+      taskAssignees
+        .filter((assignee) => assignee.task_id === task.id)
+        .map((assignee) => assignee.member_id),
+    )
+    setSelectedLabelIds(
+      taskLabels
+        .filter((label) => label.task_id === task.id)
+        .map((label) => label.label_id),
+    )
+    setIsFormOpen(true)
+  }
+
+  async function replaceTaskAssignees(taskId: string, assigneeIds: string[]) {
+    const deleteResult = await supabase
+      .from('task_assignees')
+      .delete()
+      .eq('task_id', taskId)
+
+    if (deleteResult.error) {
+      setErrorMessage(deleteResult.error.message)
+      return false
+    }
+
+    if (assigneeIds.length === 0) {
+      setTaskAssignees((currentAssignees) =>
+        currentAssignees.filter((assignee) => assignee.task_id !== taskId),
+      )
+      return true
+    }
+
+    const assigneeRows = assigneeIds.map((memberId) => ({
+      user_id: userId,
+      task_id: taskId,
+      member_id: memberId,
+    }))
+
+    const insertResult = await supabase
+      .from('task_assignees')
+      .insert(assigneeRows)
+      .select()
+
+    if (insertResult.error) {
+      setErrorMessage(insertResult.error.message)
+      return false
+    }
+
+    setTaskAssignees((currentAssignees) => [
+      ...currentAssignees.filter((assignee) => assignee.task_id !== taskId),
+      ...(insertResult.data as TaskAssignee[]),
+    ])
+    return true
+  }
+
+  async function replaceTaskLabels(taskId: string, labelIds: string[]) {
+    const deleteResult = await supabase
+      .from('task_labels')
+      .delete()
+      .eq('task_id', taskId)
+
+    if (deleteResult.error) {
+      setErrorMessage(deleteResult.error.message)
+      return false
+    }
+
+    if (labelIds.length === 0) {
+      setTaskLabels((currentLabels) =>
+        currentLabels.filter((label) => label.task_id !== taskId),
+      )
+      return true
+    }
+
+    const labelRows = labelIds.map((labelId) => ({
+      user_id: userId,
+      task_id: taskId,
+      label_id: labelId,
+    }))
+
+    const insertResult = await supabase
+      .from('task_labels')
+      .insert(labelRows)
+      .select()
+
+    if (insertResult.error) {
+      setErrorMessage(insertResult.error.message)
+      return false
+    }
+
+    setTaskLabels((currentLabels) => [
+      ...currentLabels.filter((label) => label.task_id !== taskId),
+      ...(insertResult.data as TaskLabel[]),
+    ])
+    return true
+  }
+
+  async function handleSaveTask(event: FormEvent) {
     event.preventDefault()
 
     const trimmedTitle = title.trim()
     if (!trimmedTitle || !userId) return
+
+    if (editingTaskId) {
+      const updatePayload = {
+        title: trimmedTitle,
+        description: description.trim() || null,
+        priority,
+        due_date: dueDate || null,
+      }
+
+      const updateResult = await supabase
+        .from('tasks')
+        .update(updatePayload)
+        .eq('id', editingTaskId)
+        .select()
+        .single()
+
+      if (updateResult.error) {
+        setErrorMessage(updateResult.error.message)
+        return
+      }
+
+      const assigneesSaved = await replaceTaskAssignees(
+        editingTaskId,
+        selectedAssigneeIds,
+      )
+      if (!assigneesSaved) return
+
+      const labelsSaved = await replaceTaskLabels(editingTaskId, selectedLabelIds)
+      if (!labelsSaved) return
+
+      setTasks((currentTasks) =>
+        currentTasks.map((task) =>
+          task.id === editingTaskId ? (updateResult.data as Task) : task,
+        ),
+      )
+      resetTaskForm()
+      return
+    }
 
     const newTask = {
       title: trimmedTitle,
@@ -306,60 +463,45 @@ function App() {
 
     const createdTask = insertResult.data as Task
 
-    if (selectedAssigneeIds.length > 0) {
-      const assigneeRows = selectedAssigneeIds.map((memberId) => ({
-        user_id: userId,
-        task_id: createdTask.id,
-        member_id: memberId,
-      }))
+    const assigneesSaved = await replaceTaskAssignees(
+      createdTask.id,
+      selectedAssigneeIds,
+    )
+    if (!assigneesSaved) return
 
-      const assigneeResult = await supabase
-        .from('task_assignees')
-        .insert(assigneeRows)
-        .select()
-
-      if (assigneeResult.error) {
-        setErrorMessage(assigneeResult.error.message)
-        return
-      }
-
-      setTaskAssignees((currentAssignees) => [
-        ...(assigneeResult.data as TaskAssignee[]),
-        ...currentAssignees,
-      ])
-    }
-
-    if (selectedLabelIds.length > 0) {
-      const labelRows = selectedLabelIds.map((labelId) => ({
-        user_id: userId,
-        task_id: createdTask.id,
-        label_id: labelId,
-      }))
-
-      const labelResult = await supabase
-        .from('task_labels')
-        .insert(labelRows)
-        .select()
-
-      if (labelResult.error) {
-        setErrorMessage(labelResult.error.message)
-        return
-      }
-
-      setTaskLabels((currentLabels) => [
-        ...(labelResult.data as TaskLabel[]),
-        ...currentLabels,
-      ])
-    }
+    const labelsSaved = await replaceTaskLabels(createdTask.id, selectedLabelIds)
+    if (!labelsSaved) return
 
     setTasks((currentTasks) => [createdTask, ...currentTasks])
-    setTitle('')
-    setDescription('')
-    setPriority('normal')
-    setDueDate('')
-    setSelectedAssigneeIds([])
-    setSelectedLabelIds([])
-    setIsFormOpen(false)
+    resetTaskForm()
+  }
+
+  async function handleDeleteTask() {
+    if (!editingTaskId) return
+
+    const confirmed = window.confirm('Delete this task? This cannot be undone.')
+    if (!confirmed) return
+
+    const deleteResult = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', editingTaskId)
+
+    if (deleteResult.error) {
+      setErrorMessage(deleteResult.error.message)
+      return
+    }
+
+    setTasks((currentTasks) =>
+      currentTasks.filter((task) => task.id !== editingTaskId),
+    )
+    setTaskAssignees((currentAssignees) =>
+      currentAssignees.filter((assignee) => assignee.task_id !== editingTaskId),
+    )
+    setTaskLabels((currentLabels) =>
+      currentLabels.filter((label) => label.task_id !== editingTaskId),
+    )
+    resetTaskForm()
   }
 
   async function handleCreateMember(event: FormEvent) {
@@ -499,7 +641,7 @@ function App() {
             {overdueTasks} overdue
           </span>
         </div>
-        <button type="button" onClick={() => setIsFormOpen(true)}>
+        <button type="button" onClick={openCreateTaskForm}>
           New task
         </button>
       </header>
@@ -635,7 +777,12 @@ function App() {
       </section>
 
       {isFormOpen && (
-        <form className="task-form" onSubmit={handleCreateTask}>
+        <form className="task-form" onSubmit={handleSaveTask}>
+          <div className="task-form-header">
+            <h2>{isEditing ? 'Edit task' : 'New task'}</h2>
+            <span>{isEditing ? 'Update fields and save' : 'Tasks start in To Do'}</span>
+          </div>
+
           <div className="form-grid">
             <label>
               Title
@@ -728,10 +875,19 @@ function App() {
           )}
 
           <div className="form-actions">
-            <button type="button" onClick={() => setIsFormOpen(false)}>
+            {isEditing && (
+              <button
+                className="danger-action"
+                type="button"
+                onClick={() => void handleDeleteTask()}
+              >
+                Delete task
+              </button>
+            )}
+            <button type="button" onClick={resetTaskForm}>
               Cancel
             </button>
-            <button type="submit">Create task</button>
+            <button type="submit">{isEditing ? 'Save task' : 'Create task'}</button>
           </div>
         </form>
       )}
@@ -763,6 +919,9 @@ function App() {
                     className="task-card"
                     draggable
                     key={task.id}
+                    onClick={() => {
+                      if (!draggingTaskId) openEditTaskForm(task)
+                    }}
                     onDragStart={() => setDraggingTaskId(task.id)}
                     onDragEnd={() => setDraggingTaskId(null)}
                   >

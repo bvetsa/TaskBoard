@@ -273,6 +273,24 @@
   box-shadow: 0 8px 20px rgb(51 42 31 / 7%);
 }
 
+.task-form-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.task-form-header h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.task-form-header span {
+  color: #6f6b63;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 160px 160px;
@@ -338,6 +356,13 @@
   border-color: #24211e;
   background: #24211e;
   color: white;
+}
+
+.form-actions .danger-action {
+  margin-right: auto;
+  border-color: #edb8b2;
+  background: #f9dfdc;
+  color: #87261f;
 }
 
 .assignee-picker {
