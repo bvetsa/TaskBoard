@@ -47,6 +47,8 @@ type TaskLabel = {
   created_at: string
 }
 
+type QuickFormType = 'member' | 'label'
+
 const columns: { status: TaskStatus; title: string }[] = [
   { status: 'todo', title: 'To Do' },
   { status: 'in_progress', title: 'In Progress' },
@@ -144,6 +146,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [activeQuickForm, setActiveQuickForm] = useState<QuickFormType | null>(
+    null,
+  )
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -293,10 +298,12 @@ function App() {
 
   function openCreateTaskForm() {
     resetTaskForm()
+    setActiveQuickForm(null)
     setIsFormOpen(true)
   }
 
   function openEditTaskForm(task: Task) {
+    setActiveQuickForm(null)
     setEditingTaskId(task.id)
     setTitle(task.title)
     setDescription(task.description ?? '')
@@ -313,6 +320,24 @@ function App() {
         .map((label) => label.label_id),
     )
     setIsFormOpen(true)
+  }
+
+  function closeQuickForm() {
+    setActiveQuickForm(null)
+    setNewMemberName('')
+    setNewLabelName('')
+  }
+
+  function openMemberForm() {
+    resetTaskForm()
+    setNewMemberName('')
+    setActiveQuickForm('member')
+  }
+
+  function openLabelForm() {
+    resetTaskForm()
+    setNewLabelName('')
+    setActiveQuickForm('label')
   }
 
   async function replaceTaskAssignees(taskId: string, assigneeIds: string[]) {
@@ -532,6 +557,7 @@ function App() {
       insertResult.data as TeamMember,
     ])
     setNewMemberName('')
+    setActiveQuickForm(null)
   }
 
   async function handleCreateLabel(event: FormEvent) {
@@ -559,6 +585,7 @@ function App() {
 
     setLabels((currentLabels) => [...currentLabels, insertResult.data as Label])
     setNewLabelName('')
+    setActiveQuickForm(null)
   }
 
   function toggleSelectedAssignee(memberId: string) {
@@ -641,9 +668,25 @@ function App() {
             {overdueTasks} overdue
           </span>
         </div>
-        <button type="button" onClick={openCreateTaskForm}>
-          New task
-        </button>
+        <div className="header-actions" aria-label="Board actions">
+          <button type="button" onClick={openCreateTaskForm}>
+            New task
+          </button>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={openMemberForm}
+          >
+            Add member
+          </button>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={openLabelForm}
+          >
+            Add tag
+          </button>
+        </div>
       </header>
 
       {errorMessage && <div className="system-message">{errorMessage}</div>}
@@ -689,12 +732,12 @@ function App() {
         </label>
 
         <label>
-          Label
+          Tag
           <select
             value={labelFilter}
             onChange={(event) => setLabelFilter(event.target.value)}
           >
-            <option value="all">All labels</option>
+            <option value="all">All tags</option>
             {labels.map((label) => (
               <option value={label.id} key={label.id}>
                 {label.name}
@@ -716,65 +759,129 @@ function App() {
         </button>
       </section>
 
-      <section className="team-panel" aria-label="Team members">
-        <div>
-          <h2>Team</h2>
-          <div className="member-list">
-            {members.map((member) => (
-              <span className="member-chip" key={member.id}>
-                <span
-                  className="avatar"
-                  style={{ backgroundColor: member.avatar_color }}
-                >
-                  {getInitials(member.name)}
-                </span>
-                {member.name}
-              </span>
-            ))}
-            {members.length === 0 && (
-              <span className="muted-note">No team members yet</span>
+      {activeQuickForm === 'member' && (
+        <div className="modal-backdrop" role="presentation">
+          <form
+            aria-labelledby="member-form-title"
+            aria-modal="true"
+            className="task-form quick-form"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') closeQuickForm()
+            }}
+            onSubmit={handleCreateMember}
+            role="dialog"
+          >
+            <div className="task-form-header">
+              <div>
+                <h2 id="member-form-title">Add team member</h2>
+                <span>Use members as task assignees</span>
+              </div>
+              <button
+                aria-label="Close team member form"
+                className="icon-button"
+                onClick={closeQuickForm}
+                type="button"
+              >
+                &times;
+              </button>
+            </div>
+
+            <label>
+              Name
+              <input
+                autoFocus
+                value={newMemberName}
+                onChange={(event) => setNewMemberName(event.target.value)}
+                placeholder="Team member name"
+              />
+            </label>
+
+            {members.length > 0 && (
+              <div className="resource-preview" aria-label="Current members">
+                {members.map((member) => (
+                  <span className="member-chip" key={member.id}>
+                    <span
+                      className="avatar"
+                      style={{ backgroundColor: member.avatar_color }}
+                    >
+                      {getInitials(member.name)}
+                    </span>
+                    {member.name}
+                  </span>
+                ))}
+              </div>
             )}
-          </div>
+
+            <div className="form-actions">
+              <button type="button" onClick={closeQuickForm}>
+                Cancel
+              </button>
+              <button type="submit">Add member</button>
+            </div>
+          </form>
         </div>
+      )}
 
-        <form className="member-form" onSubmit={handleCreateMember}>
-          <input
-            value={newMemberName}
-            onChange={(event) => setNewMemberName(event.target.value)}
-            placeholder="Add team member"
-          />
-          <button type="submit">Add</button>
-        </form>
-      </section>
+      {activeQuickForm === 'label' && (
+        <div className="modal-backdrop" role="presentation">
+          <form
+            aria-labelledby="label-form-title"
+            aria-modal="true"
+            className="task-form quick-form"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') closeQuickForm()
+            }}
+            onSubmit={handleCreateLabel}
+            role="dialog"
+          >
+            <div className="task-form-header">
+              <div>
+                <h2 id="label-form-title">Add tag</h2>
+                <span>Tags help filter and group work</span>
+              </div>
+              <button
+                aria-label="Close tag form"
+                className="icon-button"
+                onClick={closeQuickForm}
+                type="button"
+              >
+                &times;
+              </button>
+            </div>
 
-      <section className="team-panel" aria-label="Labels">
-        <div>
-          <h2>Labels</h2>
-          <div className="member-list">
-            {labels.map((label) => (
-              <span className="label-chip" key={label.id}>
-                <span
-                  className="label-dot"
-                  style={{ backgroundColor: label.color }}
-                />
-                {label.name}
-              </span>
-            ))}
-            {labels.length === 0 && (
-              <span className="muted-note">No labels yet</span>
+            <label>
+              Tag name
+              <input
+                autoFocus
+                value={newLabelName}
+                onChange={(event) => setNewLabelName(event.target.value)}
+                placeholder="Tag name"
+              />
+            </label>
+
+            {labels.length > 0 && (
+              <div className="resource-preview" aria-label="Current tags">
+                {labels.map((label) => (
+                  <span className="label-chip" key={label.id}>
+                    <span
+                      className="label-dot"
+                      style={{ backgroundColor: label.color }}
+                    />
+                    {label.name}
+                  </span>
+                ))}
+              </div>
             )}
-          </div>
-        </div>
 
-        <form className="member-form" onSubmit={handleCreateLabel}>
-          <input
-            value={newLabelName}
-            onChange={(event) => setNewLabelName(event.target.value)}
-            placeholder="Add label"
-          />
-          <button type="submit">Add</button>
-        </form>
-      </section>
+            <div className="form-actions">
+              <button type="button" onClick={closeQuickForm}>
+                Cancel
+              </button>
+              <button type="submit">Add tag</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {isFormOpen && (
         <div className="modal-backdrop" role="presentation">
@@ -878,7 +985,7 @@ function App() {
 
             {labels.length > 0 && (
               <fieldset className="assignee-picker">
-                <legend>Labels</legend>
+                <legend>Tags</legend>
                 <div>
                   {labels.map((label) => (
                     <label key={label.id}>

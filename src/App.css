@@ -60,7 +60,14 @@
   color: #87261f;
 }
 
-.app-header button {
+.header-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.header-actions button {
   height: 40px;
   padding: 0 16px;
   border: 0;
@@ -68,6 +75,12 @@
   background: #24211e;
   color: white;
   font-weight: 800;
+}
+
+.header-actions .secondary-action {
+  border: 1px solid #cfc5b7;
+  background: white;
+  color: #24211e;
 }
 
 .system-message,
@@ -143,29 +156,6 @@
   font-weight: 800;
 }
 
-.team-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
-  gap: 16px;
-  align-items: start;
-  margin-bottom: 18px;
-  padding: 14px;
-  border: 1px solid #ddd6ca;
-  border-radius: 8px;
-  background: #fffcf7;
-}
-
-.team-panel h2 {
-  margin: 0 0 10px;
-  font-size: 15px;
-}
-
-.member-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .member-chip {
   min-height: 34px;
   display: inline-flex;
@@ -207,39 +197,6 @@
   height: 9px;
   flex: 0 0 auto;
   border-radius: 50%;
-}
-
-.member-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-}
-
-.member-form input {
-  width: 100%;
-  height: 40px;
-  border: 1px solid #cfc5b7;
-  border-radius: 8px;
-  background: white;
-  color: #24211e;
-  font: inherit;
-  padding: 0 10px;
-  outline: none;
-}
-
-.member-form input:focus {
-  border-color: #4f62b3;
-  box-shadow: 0 0 0 3px #e1e6f8;
-}
-
-.member-form button {
-  height: 40px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 8px;
-  background: #24211e;
-  color: white;
-  font-weight: 800;
 }
 
 .avatar {
@@ -285,6 +242,10 @@
   box-shadow: 0 18px 48px rgb(36 33 30 / 24%);
 }
 
+.quick-form {
+  width: min(440px, 100%);
+}
+
 .task-form-header {
   display: flex;
   align-items: start;
@@ -320,6 +281,12 @@
 .icon-button:hover {
   border-color: #4f62b3;
   color: #4f62b3;
+}
+
+.resource-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .form-grid {
@@ -619,9 +586,6 @@
     padding-bottom: 12px;
   }
 
-  .team-panel {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 640px) {
@@ -640,7 +604,13 @@
     grid-template-columns: 1fr;
   }
 
-  .app-header button {
+  .header-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .header-actions button {
     width: 100%;
   }
 
