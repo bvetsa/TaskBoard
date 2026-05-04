@@ -32,6 +32,21 @@ type TaskAssignee = {
   created_at: string
 }
 
+type Label = {
+  id: string
+  user_id: string
+  name: string
+  color: string
+  created_at: string
+}
+
+type TaskLabel = {
+  user_id: string
+  task_id: string
+  label_id: string
+  created_at: string
+}
+
 const columns: { status: TaskStatus; title: string }[] = [
   { status: 'todo', title: 'To Do' },
   { status: 'in_progress', title: 'In Progress' },
@@ -40,6 +55,7 @@ const columns: { status: TaskStatus; title: string }[] = [
 ]
 
 const avatarColors = ['#d94f45', '#21867a', '#4f62b3', '#b56b23', '#6d5cae']
+const labelColors = ['#21867a', '#b56b23', '#4f62b3', '#d94f45', '#6d5cae']
 
 const initialTasks: Task[] = [
   {
@@ -122,6 +138,8 @@ function App() {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [members, setMembers] = useState<TeamMember[]>([])
   const [taskAssignees, setTaskAssignees] = useState<TaskAssignee[]>([])
+  const [labels, setLabels] = useState<Label[]>([])
+  const [taskLabels, setTaskLabels] = useState<TaskLabel[]>([])
   const [userId, setUserId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -131,13 +149,16 @@ function App() {
   const [priority, setPriority] = useState<Task['priority']>('normal')
   const [dueDate, setDueDate] = useState('')
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([])
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([])
   const [newMemberName, setNewMemberName] = useState('')
+  const [newLabelName, setNewLabelName] = useState('')
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<Task['priority'] | 'all'>(
     'all',
   )
   const [assigneeFilter, setAssigneeFilter] = useState('all')
+  const [labelFilter, setLabelFilter] = useState('all')
 
   const completedTasks = tasks.filter((task) => task.status === 'done').length
   const overdueTasks = tasks.filter((task) => {
@@ -163,8 +184,13 @@ function App() {
         (assignee) =>
           assignee.task_id === task.id && assignee.member_id === assigneeFilter,
       )
+    const matchesLabel =
+      labelFilter === 'all' ||
+      taskLabels.some(
+        (label) => label.task_id === task.id && label.label_id === labelFilter,
+      )
 
-    return matchesSearch && matchesPriority && matchesAssignee
+    return matchesSearch && matchesPriority && matchesAssignee && matchesLabel
   })
 
   useEffect(() => {
@@ -196,15 +222,25 @@ function App() {
 
       setUserId(user.id)
 
-      const [tasksResult, membersResult, assigneesResult] = await Promise.all([
-        supabase.from('tasks').select('*').order('created_at', {
-          ascending: true,
-        }),
-        supabase.from('team_members').select('*').order('created_at', {
-          ascending: true,
-        }),
-        supabase.from('task_assignees').select('*'),
-      ])
+      const [
+        tasksResult,
+        membersResult,
+        assigneesResult,
+        labelsResult,
+        taskLabelsResult,
+      ] = await Promise.all([
+          supabase.from('tasks').select('*').order('created_at', {
+            ascending: true,
+          }),
+          supabase.from('team_members').select('*').order('created_at', {
+            ascending: true,
+          }),
+          supabase.from('task_assignees').select('*'),
+          supabase.from('labels').select('*').order('created_at', {
+            ascending: true,
+          }),
+          supabase.from('task_labels').select('*'),
+        ])
 
       if (tasksResult.error) {
         setErrorMessage(tasksResult.error.message)
@@ -222,6 +258,18 @@ function App() {
         setErrorMessage(assigneesResult.error.message)
       } else {
         setTaskAssignees(assigneesResult.data as TaskAssignee[])
+      }
+
+      if (labelsResult.error) {
+        setErrorMessage(labelsResult.error.message)
+      } else {
+        setLabels(labelsResult.data as Label[])
+      }
+
+      if (taskLabelsResult.error) {
+        setErrorMessage(taskLabelsResult.error.message)
+      } else {
+        setTaskLabels(taskLabelsResult.data as TaskLabel[])
       }
 
       setIsLoading(false)
@@ -281,12 +329,36 @@ function App() {
       ])
     }
 
+    if (selectedLabelIds.length > 0) {
+      const labelRows = selectedLabelIds.map((labelId) => ({
+        user_id: userId,
+        task_id: createdTask.id,
+        label_id: labelId,
+      }))
+
+      const labelResult = await supabase
+        .from('task_labels')
+        .insert(labelRows)
+        .select()
+
+      if (labelResult.error) {
+        setErrorMessage(labelResult.error.message)
+        return
+      }
+
+      setTaskLabels((currentLabels) => [
+        ...(labelResult.data as TaskLabel[]),
+        ...currentLabels,
+      ])
+    }
+
     setTasks((currentTasks) => [createdTask, ...currentTasks])
     setTitle('')
     setDescription('')
     setPriority('normal')
     setDueDate('')
     setSelectedAssigneeIds([])
+    setSelectedLabelIds([])
     setIsFormOpen(false)
   }
 
@@ -320,11 +392,46 @@ function App() {
     setNewMemberName('')
   }
 
+  async function handleCreateLabel(event: FormEvent) {
+    event.preventDefault()
+
+    const trimmedName = newLabelName.trim()
+    if (!trimmedName || !userId) return
+
+    const label = {
+      user_id: userId,
+      name: trimmedName,
+      color: labelColors[labels.length % labelColors.length],
+    }
+
+    const insertResult = await supabase
+      .from('labels')
+      .insert(label)
+      .select()
+      .single()
+
+    if (insertResult.error) {
+      setErrorMessage(insertResult.error.message)
+      return
+    }
+
+    setLabels((currentLabels) => [...currentLabels, insertResult.data as Label])
+    setNewLabelName('')
+  }
+
   function toggleSelectedAssignee(memberId: string) {
     setSelectedAssigneeIds((currentIds) =>
       currentIds.includes(memberId)
         ? currentIds.filter((id) => id !== memberId)
         : [...currentIds, memberId],
+    )
+  }
+
+  function toggleSelectedLabel(labelId: string) {
+    setSelectedLabelIds((currentIds) =>
+      currentIds.includes(labelId)
+        ? currentIds.filter((id) => id !== labelId)
+        : [...currentIds, labelId],
     )
   }
 
@@ -336,6 +443,16 @@ function App() {
     )
 
     return members.filter((member) => memberIds.has(member.id))
+  }
+
+  function getTaskLabels(taskId: string) {
+    const labelIds = new Set(
+      taskLabels
+        .filter((label) => label.task_id === taskId)
+        .map((label) => label.label_id),
+    )
+
+    return labels.filter((label) => labelIds.has(label.id))
   }
 
   async function moveTask(taskId: string, status: TaskStatus) {
@@ -429,12 +546,28 @@ function App() {
           </select>
         </label>
 
+        <label>
+          Label
+          <select
+            value={labelFilter}
+            onChange={(event) => setLabelFilter(event.target.value)}
+          >
+            <option value="all">All labels</option>
+            {labels.map((label) => (
+              <option value={label.id} key={label.id}>
+                {label.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <button
           type="button"
           onClick={() => {
             setSearchQuery('')
             setPriorityFilter('all')
             setAssigneeFilter('all')
+            setLabelFilter('all')
           }}
         >
           Clear filters
@@ -467,6 +600,35 @@ function App() {
             value={newMemberName}
             onChange={(event) => setNewMemberName(event.target.value)}
             placeholder="Add team member"
+          />
+          <button type="submit">Add</button>
+        </form>
+      </section>
+
+      <section className="team-panel" aria-label="Labels">
+        <div>
+          <h2>Labels</h2>
+          <div className="member-list">
+            {labels.map((label) => (
+              <span className="label-chip" key={label.id}>
+                <span
+                  className="label-dot"
+                  style={{ backgroundColor: label.color }}
+                />
+                {label.name}
+              </span>
+            ))}
+            {labels.length === 0 && (
+              <span className="muted-note">No labels yet</span>
+            )}
+          </div>
+        </div>
+
+        <form className="member-form" onSubmit={handleCreateLabel}>
+          <input
+            value={newLabelName}
+            onChange={(event) => setNewLabelName(event.target.value)}
+            placeholder="Add label"
           />
           <button type="submit">Add</button>
         </form>
@@ -543,6 +705,28 @@ function App() {
             </fieldset>
           )}
 
+          {labels.length > 0 && (
+            <fieldset className="assignee-picker">
+              <legend>Labels</legend>
+              <div>
+                {labels.map((label) => (
+                  <label key={label.id}>
+                    <input
+                      checked={selectedLabelIds.includes(label.id)}
+                      onChange={() => toggleSelectedLabel(label.id)}
+                      type="checkbox"
+                    />
+                    <span
+                      className="label-dot"
+                      style={{ backgroundColor: label.color }}
+                    />
+                    {label.name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+
           <div className="form-actions">
             <button type="button" onClick={() => setIsFormOpen(false)}>
               Cancel
@@ -591,6 +775,19 @@ function App() {
                       <span className={`due-date ${getDueDateTone(task)}`}>
                         {formatDueDate(task.due_date)}
                       </span>
+                    )}
+                    {getTaskLabels(task.id).length > 0 && (
+                      <div className="card-labels">
+                        {getTaskLabels(task.id).map((label) => (
+                          <span className="label-chip compact" key={label.id}>
+                            <span
+                              className="label-dot"
+                              style={{ backgroundColor: label.color }}
+                            />
+                            {label.name}
+                          </span>
+                        ))}
+                      </div>
                     )}
                     <div className="card-footer">
                       <div className="avatar-stack">

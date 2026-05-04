@@ -95,7 +95,7 @@
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 180px 200px auto;
+  grid-template-columns: minmax(220px, 1fr) 160px 180px 160px auto;
   gap: 12px;
   align-items: end;
   margin-bottom: 18px;
@@ -178,6 +178,35 @@
   color: #24211e;
   font-size: 13px;
   font-weight: 800;
+}
+
+.label-chip {
+  min-height: 30px;
+  width: fit-content;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 9px;
+  border: 1px solid #ddd6ca;
+  border-radius: 8px;
+  background: white;
+  color: #24211e;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.label-chip.compact {
+  min-height: 24px;
+  padding: 3px 7px;
+  font-size: 11px;
+}
+
+.label-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
 }
 
 .member-form {
@@ -451,6 +480,12 @@
   color: #6f6b63;
   font-size: 13px;
   line-height: 1.45;
+}
+
+.card-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .card-footer {
